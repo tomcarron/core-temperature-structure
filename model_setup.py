@@ -17,11 +17,9 @@ from radmc3dPy.analyze import *
 from radmc3dPy.natconst import * 
 from astropy.wcs import WCS
 import sys
-sys.path.append('../../SED_sgrb2/SED_fit')
-from fit import extract_dimensions
 
 class model_setup_1Dspher:
-    def __init__(self,rho0,prho,nphot=100000,rin=1000,rout=5000,gaussian=False):
+    def __init__(self,rho0,prho,nphot=100000,rin=1000,rout=5000,gaussian=False,plateau=false):
         self.rho0=rho0
         self.nphot=nphot
         self.gaussian=gaussian
@@ -73,16 +71,18 @@ class model_setup_1Dspher:
         #
         # Make the dust density model
         #
-
         self.rr = self.xc
-        self.rhod = np.zeros_like(self.xc)
-        for i in range(len(self.rhod)):
-            if self.xc[i] < self.r_break+1*au: #hardcoded fix, need better
-                self.rhod[i] = rho0
-            else:
-                self.rhod[i] = rho0 * ((self.rr[i] - self.r_break) / au) ** prho
+        self.rhod = rho0 * ((self.rr) / au) ** prho
+        if plateau:
+            self.rr = self.xc
+            self.rhod = np.zeros_like(self.xc)
+            for i in range(len(self.rhod)):
+                if self.xc[i] < self.r_break+1*au: #hardcoded fix, need better
+                    self.rhod[i] = rho0
+                else:
+                    self.rhod[i] = rho0 * ((self.rr[i] - self.r_break) / au) ** prho
 
-        if gaussian:
+        elif gaussian:
             self.rhod = rho0 * gaussian_profile(self.rr/au,1e-5)
 
         #
@@ -420,3 +420,12 @@ def process_radmc_image(input_fits, output_fits,beam_size_arcsec,overwrite=False
 
 def gaussian_profile(r,alpha):
     return np.exp(-alpha * r**2)
+
+#function which returns the two largest dimensions of an array
+def extract_dimensions(array):
+    if array.ndim <= 2:
+        return array
+    else:
+        dimensions_to_remove = np.where(np.array(array.shape) < 2)[0]
+        modified_array = np.squeeze(array, axis=tuple(dimensions_to_remove))
+        return modified_array

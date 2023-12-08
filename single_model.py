@@ -13,7 +13,7 @@ prho=-1.0 #power law index
 #print(gaussian_profile())
 
 #initialise model
-test=model(rho0,prho,nphot=100000,rin=10,rout=2000,gaussian=True)
+test=model(rho0,prho,nphot=100000,rin=10,rout=2000,gaussian=False,plateau=False)
 
 #write input file
 test.write_input(amr=False,mrw=True)
