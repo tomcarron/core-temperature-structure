@@ -17,9 +17,11 @@ from radmc3dPy.analyze import *
 from radmc3dPy.natconst import * 
 from astropy.wcs import WCS
 import sys
+#sys.path.append('../../SED_sgrb2/SED_fit')
+#from fit import extract_dimensions
 
 class model_setup_1Dspher:
-    def __init__(self,rho0,prho,nphot=100000,rin=1000,rout=5000,gaussian=False,plateau=false):
+    def __init__(self,rho0,prho,nphot=100000,rin=1000,rout=5000,gaussian=False,plateau=False):
         self.rho0=rho0
         self.nphot=nphot
         self.gaussian=gaussian
@@ -183,7 +185,7 @@ class model_setup_1Dspher:
 
         total = t1-t0
         print("Calculating the model cost: "+str(total)+" s")
-        with open('cost.txt') as f:
+        with open('cost.txt','w+') as f:
             f.write("Calculating the model cost: "+str(total)+" s")
         #Make the necessary calls to run radmc3d
         return
@@ -211,10 +213,10 @@ class model_setup_1Dspher:
             os.system('radmc3d image lambda '+str(wl))
             im   = readImage()
             im.writeFits('model'+str(wl)+'.fits')
-            process_radmc_image('model'+str(wl)+'.fits','model'+str(wl)+'_smooth.fits',0.4)
+            process_radmc_image('model'+str(wl)+'.fits','model'+str(wl)+'_smooth.fits',0.4,overwrite=True)
             cim = im.imConv(fwhm=[0.4, 0.4], pa=0., dpc=8340.) 
             #plt.figure()
-            plotImage(cim, arcsec=True, dpc=8340., cmap=plb.cm.gist_heat)
+            #plotImage(cim, arcsec=True, dpc=8340., cmap=plb.cm.gist_heat)
             #cim.writeFits('model'+str(wl)+'.fits', dpc=8340.)
             #plt.show()
         t1 = time.time()
@@ -226,22 +228,35 @@ class model_setup_1Dspher:
         for wl in wls:
             os.system("radmc3d tausurf 1.0 lambda "+str(wl))
             im   = readImage()
-            #plotImage(im,arcsec=True,dpc=8340.)
+            data = np.squeeze(im.image[:, ::-1, 0].T)
+            plotImage(im,arcsec=True,dpc=8340.)
             im.writeFits('tau_surf_'+str(wl)+'.fits')
+            wcs = WCS(fits.getheader('tau_surf_'+str(wl)+'.fits'))
+            newhdu = fits.PrimaryHDU(data,wcs.to_header())
+            newhdu.writeto('tau_surf_'+str(wl)+'.fits',overwrite=True)
 
     def make_tau_map(self,wls):
         for wl in wls:
             os.system("radmc3d image lambda "+str(wl)+" tracetau")
             im   = readImage()
+            data = np.squeeze(im.image[:, ::-1, 0].T)
             #plotImage(im,arcsec=True,dpc=8340.)
             im.writeFits('tau'+str(wl)+'.fits')
+            wcs = WCS(fits.getheader('tau'+str(wl)+'.fits')).celestial
+            newhdu = fits.PrimaryHDU(data,wcs.to_header())
+            newhdu.writeto('tau'+str(wl)+'.fits',overwrite=True)
 
     def make_column_density_map(self,wls):
         for wl in wls:
             os.system("radmc3d image lambda "+str(wl)+" tracecolumn")
             im   = readImage()
+            data = np.squeeze(im.image[:, ::-1, 0].T)
             #plotImage(im,arcsec=True,dpc=8340.)
             im.writeFits('column_density_'+str(wl)+'.fits')
+            #open fits file, get wcs, overwrite
+            wcs = WCS(fits.getheader('column_density_'+str(wl)+'.fits')).celestial
+            newhdu = fits.PrimaryHDU(data,wcs.to_header())
+            newhdu.writeto('column_density_'+str(wl)+'.fits',overwrite=True)
 
     
     def temperature_profile(self):
@@ -418,6 +433,20 @@ def process_radmc_image(input_fits, output_fits,beam_size_arcsec,overwrite=False
 
     print(f"Smoothing completed. Result saved to: {output_fits}")
 
+def process_radmc_tausurf_image(input_fits, output_fits,overwrite=False):
+    hdulist = fits.open(input_fits)
+    data = extract_dimensions(hdulist[0].data)
+    header = hdulist[0].header
+    wcs = WCS(header)
+
+    # Update the header to reflect the new units and beam information
+    header['BUNIT'] = '[cm]'
+
+    # Save the smoothed data to a new FITS file
+    fits.writeto(output_fits, data, header, overwrite=overwrite)
+
+    print(f" Result saved to: {output_fits}")
+
 def gaussian_profile(r,alpha):
     return np.exp(-alpha * r**2)
 
@@ -429,3 +458,9 @@ def extract_dimensions(array):
         dimensions_to_remove = np.where(np.array(array.shape) < 2)[0]
         modified_array = np.squeeze(array, axis=tuple(dimensions_to_remove))
         return modified_array
+    
+
+def read_image():
+    im = readImage()
+    #data = np.squeeze(im.image[:, ::-1, 0].T)
+    data = im.image
