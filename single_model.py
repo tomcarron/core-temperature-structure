@@ -2,7 +2,7 @@ import sys
 sys.path.append('../')
 from temperature_structure.model_setup import model_setup_1Dspher as model
 import astropy.constants as const
-
+#this is a comment
 
 rho0=1e10 *1.6735575e-24   #reference density cgs units
 prho=-1.0 #power law index
